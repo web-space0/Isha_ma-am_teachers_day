@@ -321,39 +321,90 @@
   });
 
   let audioCtx = null, musicTimer = null, musicOn = false;
-  const musicBtn = document.getElementById('music');
-  const melody = [261.63,329.63,392.00,329.63,293.66,349.23,440.00,392.00];
 
-  function playNote(freq, startTime, duration){
-    if(!audioCtx) return;
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = 'sine';
-    osc.frequency.value = freq;
-    gain.gain.setValueAtTime(0.0001, startTime);
-    gain.gain.exponentialRampToValueAtTime(0.14, startTime + 0.04);
-    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
-    osc.connect(gain).connect(audioCtx.destination);
-    osc.start(startTime);
-    osc.stop(startTime + duration + 0.05);
+const melody = [
+  [261.63, 0.00],   // C4
+  [329.63, 0.75],   // E4
+  [392.00, 1.50],   // G4
+  [329.63, 2.30],   // E4
+  [293.66, 3.10],   // D4
+  [349.23, 3.85],   // F4
+  [392.00, 4.60],   // G4
+  [523.25, 5.45],   // C5
+  [440.00, 6.30],   // A4
+  [392.00, 7.10]    // G4
+];
+
+function playNote(freq, startTime, duration = 1.1, volume = 0.035) {
+  if (!audioCtx) return;
+
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(freq, startTime);
+
+  // Very gentle fade-in and fade-out
+  gain.gain.setValueAtTime(0.0001, startTime);
+  gain.gain.exponentialRampToValueAtTime(
+    volume,
+    startTime + 0.12
+  );
+  gain.gain.exponentialRampToValueAtTime(
+    0.0001,
+    startTime + duration
+  );
+
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+
+  osc.start(startTime);
+  osc.stop(startTime + duration + 0.1);
+}
+
+function scheduleMelody() {
+  if (!musicOn || !audioCtx) return;
+
+  const now = audioCtx.currentTime;
+
+  melody.forEach(([frequency, time]) => {
+    playNote(frequency, now + time, 1.15, 0.032);
+  });
+
+  // Very soft low notes underneath the melody
+  playNote(130.81, now, 2.2, 0.008);
+  playNote(146.83, now + 3.1, 2.2, 0.007);
+  playNote(130.81, now + 6.3, 2.0, 0.008);
+
+  musicTimer = setTimeout(scheduleMelody, 9000);
+}
+
+async function toggleMusic() {
+  if (!audioCtx) {
+    audioCtx = new (
+      window.AudioContext ||
+      window.webkitAudioContext
+    )();
   }
 
-  function scheduleMelody(){
-    if(!musicOn || !audioCtx) return;
-    const now = audioCtx.currentTime;
-    melody.forEach((f,i)=>playNote(f, now + i*0.48, 0.42));
-    musicTimer = setTimeout(scheduleMelody, melody.length*480);
+  if (audioCtx.state === "suspended") {
+    await audioCtx.resume();
   }
 
-  async function toggleMusic(){
-    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if(audioCtx.state === 'suspended') await audioCtx.resume();
-    musicOn = !musicOn;
-    musicBtn.classList.toggle('on', musicOn);
-    musicBtn.textContent = musicOn ? '♫ Music: On' : '♫ Music: Off';
-    if(musicOn) scheduleMelody();
-    else { clearTimeout(musicTimer); musicTimer = null; }
+  musicOn = !musicOn;
+
+  musicBtn.classList.toggle("on", musicOn);
+
+  musicBtn.textContent =
+    musicOn ? "♫ Music: On" : "♫ Music: Off";
+
+  if (musicOn) {
+    scheduleMelody();
+  } else {
+    clearTimeout(musicTimer);
+    musicTimer = null;
   }
+}
 
   musicBtn.addEventListener('click', toggleMusic);
 
